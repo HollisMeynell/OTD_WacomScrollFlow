@@ -5,3 +5,5 @@
 artifacts/
 .vs/
 *.user
+/Plugin-Repository/
+/WacomScrollFlow-*.zip.sha256

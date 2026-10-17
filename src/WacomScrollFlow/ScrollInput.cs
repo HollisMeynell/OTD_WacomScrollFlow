@@ -16,10 +16,10 @@ public sealed class ScrollInput : IPositionedPipelineElement<IDeviceReport>, IDi
 
     [Property("Button source"), DefaultPropertyValue("Pen"), PropertyValidated(nameof(ButtonSources))]
     public string ButtonSource { get; set; } = "Pen";
-    public static IEnumerable<string> ButtonSources => new[] { "Pen", "Aux", "Keyboard" };
+    public static IEnumerable<string> ButtonSources => new[] { "Pen", "Aux" };
 
-    [Property("Button number / virtual key"), DefaultPropertyValue(1),
-     ToolTip("Pen/Aux: 1-based button number. Keyboard: Windows virtual-key code (32 = Space).")]
+    [Property("Button number"), DefaultPropertyValue(1),
+     ToolTip("Pen/Aux: 1-based button number.")]
     public int Button { get; set; } = 1;
 
     [Property("Tip pressure (%)"), DefaultPropertyValue(1f)]
@@ -46,7 +46,6 @@ public sealed class ScrollInput : IPositionedPipelineElement<IDeviceReport>, IDi
             {
                 "Pen" when report is ITabletReport pen => ReadButton(pen.PenButtons),
                 "Aux" when report is IAuxReport aux => ReadButton(aux.AuxButtons),
-                "Keyboard" => NativeKeyboard.IsDown(Button),
                 "Pen" when report is OutOfRangeReport => false,
                 _ => null
             };
@@ -94,8 +93,8 @@ public sealed class ScrollInput : IPositionedPipelineElement<IDeviceReport>, IDi
                 var scroll = session.Gesture.Update(mm, touching,
                     Math.Max(0.01f, Finite(VerticalThreshold, 0.5f)),
                     Math.Clamp(Finite(UnitsPerMm, 24), 0.01f, 1200), ReverseVertical, ReverseHorizontal);
-                if (scroll.Vertical != 0) NativeKeyboard.Scroll(scroll.Vertical, false);
-                if (scroll.Horizontal != 0) NativeKeyboard.Scroll(scroll.Horizontal, true);
+                if (scroll.Vertical != 0) NativeScroll.Scroll(scroll.Vertical, false);
+                if (scroll.Horizontal != 0) NativeScroll.Scroll(scroll.Horizontal, true);
                 // Suppress the tip binding before OTD's post-transform binding handler.
                 tabletReport.Pressure = 0;
             }

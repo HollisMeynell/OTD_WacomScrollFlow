@@ -3,10 +3,8 @@ using OpenTabletDriver.Plugin;
 
 namespace WacomScrollFlow;
 
-internal static class NativeKeyboard
+internal static class NativeScroll
 {
-    [DllImport("user32.dll")]
-    private static extern short GetAsyncKeyState(int key);
 
 
     [StructLayout(LayoutKind.Sequential)]
@@ -41,7 +39,5 @@ internal static class NativeKeyboard
         }
     }
 
-    public static bool IsDown(int key) => OperatingSystem.IsWindows() &&
-        key is > 0 and <= 255 && (GetAsyncKeyState(key) & 0x8000) != 0;
 
 }

@@ -20,7 +20,7 @@ if ($assemblyVersion -ne [version]"$Version.0") { throw 'The built DLL version d
 $outputDirectory = Join-Path $repositoryRoot 'artifacts'
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 $archive = Join-Path $outputDirectory "WacomScrollFlow-$Version-win.zip"
-$files = @($dll, (Join-Path $repositoryRoot 'README.md'), (Join-Path $repositoryRoot 'README-zh.md'))
+$files = @($dll, (Join-Path $repositoryRoot 'README.md'), (Join-Path $repositoryRoot 'README-zh.md'), (Join-Path $repositoryRoot 'LICENSE'))
 Compress-Archive -LiteralPath $files -DestinationPath $archive -Force
 $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText("$archive.sha256", "$hash  $([IO.Path]::GetFileName($archive))`n", [Text.UTF8Encoding]::new($false))

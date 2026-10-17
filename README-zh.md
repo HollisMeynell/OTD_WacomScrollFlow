@@ -1,6 +1,10 @@
-﻿# WacomScrollFlow
+# WacomScrollFlow
 
 [English](README.md) | 简体中文
+
+**源码更新：** 当前源码已移除 Keyboard 模式和键盘轮询，仅支持 Pen/Aux 按钮。现有 v0.1.2 发布包未重新编译，仍包含 Keyboard 模式。
+
+本项目（包括 v0.1.2 发布版本）使用 [MIT No Attribution（MIT-0）许可证](LICENSE)，允许使用、修改、分发和商用，无需保留署名。
 
 Windows 上的 OpenTabletDriver 滚动插件。使用 .NET 8，针对 OTD 0.6.6.2 插件 API 编译；参考了 0.6.7 的输入管线源码。已在 OpenTabletDriver 0.6.7 中实机测试通过。
 
@@ -39,8 +43,8 @@ Input 的配置项：
 
 | 配置 | 默认值 | 含义 |
 | --- | --- | --- |
-| Button source | Pen | `Pen` 笔侧键、`Aux` 板上快捷键、`Keyboard` Windows 键盘 |
-| Button number / virtual key | 1 | Pen/Aux 从 1 开始；Keyboard 使用十进制虚拟键码，例如空格 32、Shift 16、F8 119 |
+| Button source | Pen | `Pen` 笔侧键、`Aux` 板上快捷键 |
+| Button number | 1 | Pen/Aux 从 1 开始 |
 | Tip pressure (%) | 1 | 开始识别滑动所需的压力百分比 |
 | Vertical threshold (mm) | 0.5 | 进入纵向滚动的位移 |
 | 横向切换阈值（固定） | 100px | 横向输出位移必须严格超过此值 |
@@ -49,7 +53,7 @@ Input 的配置项：
 | Reverse vertical | false | 反转纵向滚动方向 |
 | Reverse horizontal | false | 反转横向滚动方向 |
 
-按键直接在插件中选择，不需要给它绑定一个 OTD 动作。插件会屏蔽选中的笔侧键或快捷键原有的 OTD 动作，同时在滚动期间屏蔽笔尖点击。Keyboard 使用轮询，不拦截键盘自身输入；按键状态在下一份设备报告到来时更新。
+按键直接在插件中选择，不需要给它绑定一个 OTD 动作。插件会屏蔽选中的笔侧键或快捷键原有的 OTD 动作，同时在滚动期间屏蔽笔尖点击。按键状态在下一份设备报告到来时更新。
 
 ## 实机验收
 

@@ -2,6 +2,8 @@
 
 English | [简体中文](README-zh.md)
 
+**Source update:** Keyboard button polling has been removed from the current source; only Pen/Aux buttons are supported. The existing v0.1.2 release still includes Keyboard mode and has not been rebuilt.
+
 A Windows scrolling plugin for [OpenTabletDriver](https://opentabletdriver.net/). Hold a configurable button and move your pen with the tip touching the tablet to scroll while keeping the cursor in place.
 
 **Tested successfully with OpenTabletDriver 0.6.7 on real hardware.** Built with .NET 8 against the OpenTabletDriver 0.6.6.2 plugin API. Windows only; other driver versions have not been verified.
@@ -34,8 +36,8 @@ Configure these options in **Scroll Flow: Input**:
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Button source | Pen | `Pen` side button, `Aux` tablet button, or `Keyboard` |
-| Button number / virtual key | 1 | Pen/Aux buttons are numbered from 1. Keyboard uses a Windows virtual-key code: Space = 32, Shift = 16, F8 = 119. |
+| Button source | Pen | `Pen` side button or `Aux` tablet button |
+| Button number | 1 | Pen/Aux buttons are numbered from 1. |
 | Tip pressure (%) | 1 | Pressure required to recognize scrolling movement |
 | Vertical threshold (mm) | 0.5 | Tablet displacement required to start vertical scrolling |
 | Wheel units per mm | 24 | Wheel units per millimeter; 120 Windows wheel units usually equal one notch |
@@ -44,7 +46,7 @@ Configure these options in **Scroll Flow: Input**:
 
 The horizontal switch threshold (100px) and dominance ratio (3) are fixed. Configure **Relative output mode** separately in **Scroll Flow: Cursor Lock**.
 
-Select the scrolling button directly in the plugin; no OTD action binding is needed. The plugin suppresses the selected Pen/Aux button's normal binding while active. Keyboard mode polls the key state on incoming device reports and does not intercept the keyboard's normal input.
+Select the scrolling button directly in the plugin; no OTD action binding is needed. The plugin suppresses the selected Pen/Aux button's normal binding while active.
 
 ## Build and test
 
@@ -79,3 +81,7 @@ git push origin v0.1.3
 The input filter reads tablet millimeters and suppresses pressure before OTD's binding handler. The output filter observes transformed pixel movement before locking the cursor, preserving the last absolute position or zeroing relative displacement. Wheel events use Windows `SendInput`.
 
 See OTD's [output pipeline](https://github.com/OpenTabletDriver/OpenTabletDriver/blob/v0.6.7/OpenTabletDriver.Plugin/Output/OutputMode.cs). If the first report arrives while the button is held and no absolute cursor anchor is available, movement is withheld until normal positioning resumes.
+
+## License
+
+Licensed under [MIT No Attribution (MIT-0)](LICENSE), including the project's v0.1.2 release. You may use, modify, and redistribute this software, including commercially, without an attribution requirement.
