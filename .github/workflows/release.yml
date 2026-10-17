@@ -1,0 +1,61 @@
+name: Build and release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Validate release tag
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw 'Expected a tag such as v0.1.2.' }
+          $version = $tag.Substring(1)
+          [xml]$project = Get-Content src/WacomScrollFlow/WacomScrollFlow.csproj -Raw
+          if ($version -ne $project.Project.PropertyGroup.Version) { throw 'Tag and project versions must match.' }
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Restore
+        run: dotnet restore tests/WacomScrollFlow.Tests/WacomScrollFlow.Tests.csproj
+
+      - name: Build
+        run: dotnet build tests/WacomScrollFlow.Tests/WacomScrollFlow.Tests.csproj -c Release --no-restore
+
+      - name: Test
+        run: dotnet test tests/WacomScrollFlow.Tests/WacomScrollFlow.Tests.csproj -c Release --no-build --no-restore
+
+      - name: Package
+        run: ./scripts/Package.ps1 -Version $env:RELEASE_VERSION
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            "artifacts/WacomScrollFlow-$env:RELEASE_VERSION-win.zip" `
+            "artifacts/WacomScrollFlow-$env:RELEASE_VERSION-win.zip.sha256" `
+            --repo $env:GITHUB_REPOSITORY `
+            --verify-tag `
+            --title "WacomScrollFlow $env:GITHUB_REF_NAME" `
+            --generate-notes
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub Release creation failed.' }
