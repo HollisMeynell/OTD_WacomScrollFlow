@@ -2,11 +2,11 @@
 
 English | [简体中文](README-zh.md)
 
-**Source update:** Keyboard button polling has been removed from the current source; only Pen/Aux buttons are supported. The existing v0.1.2 release still includes Keyboard mode and has not been rebuilt.
+**v0.1.3 source:** Uses OpenTabletDriver's scrolling interface on Windows, Linux, and macOS, with Pen/Aux buttons only. The existing v0.1.2 release remains Windows-only and includes Keyboard mode.
 
-A Windows scrolling plugin for [OpenTabletDriver](https://opentabletdriver.net/). Hold a configurable button and move your pen with the tip touching the tablet to scroll while keeping the cursor in place.
+A pen scrolling plugin for [OpenTabletDriver](https://opentabletdriver.net/). Hold a configurable button and move your pen with the tip touching the tablet to scroll while keeping the cursor in place.
 
-**Tested successfully with OpenTabletDriver 0.6.7 on real hardware.** Built with .NET 8 against the OpenTabletDriver 0.6.6.2 plugin API. Windows only; other driver versions have not been verified.
+**Requires OpenTabletDriver 0.6.7 or later and .NET 8.** Version 0.1.2 was tested successfully on Windows with OTD 0.6.7. The v0.1.3 backend uses OTD's Windows, Linux, and macOS pointers; it still requires real-device verification on each platform. Other driver versions have not been verified.
 
 ## How it works
 
@@ -19,16 +19,16 @@ The cursor lock applies to the tablet output. Other pointing devices can still m
 
 ## Installation
 
-1. Download `WacomScrollFlow-<version>-win.zip` from [Releases](https://github.com/HollisMeynell/OTD_WacomScrollFlow/releases).
+1. Download `WacomScrollFlow-<version>.zip (v0.1.3 onward)` from [Releases](https://github.com/HollisMeynell/OTD_WacomScrollFlow/releases).
 2. Open the plugin directory from OpenTabletDriver, create a `WacomScrollFlow` folder, and extract the ZIP into it. The DLL should be directly inside that folder.
 3. Completely restart OpenTabletDriver.
 4. Enable **both** filters for the same tablet:
    - **Scroll Flow: Input**: place before other filters. Reads the original position, pressure, and button state.
    - **Scroll Flow: Cursor Lock**: place after other filters. Locks the transformed output. Set **Relative output mode** to `true` when using OTD Relative Mode; leave it `false` for Absolute Mode.
 
-The release ZIP contains the plugin DLL and documentation, without OpenTabletDriver's own assemblies. Publishing a GitHub Release does not automatically list the plugin in Plugins Manager; that requires a separate submission to the official plugin repository.
+The release ZIP contains the plugin DLL, license, and documentation, without OpenTabletDriver's own assemblies. Publishing a GitHub Release does not automatically list the plugin in Plugins Manager; that requires a separate submission to the official plugin repository.
 
-Standard Absolute Mode and Relative Mode are the intended output modes. Windows Ink, custom output modes, and asynchronous interpolation filters have not been verified. Start with other filters disabled when troubleshooting.
+Standard Absolute Mode and Relative Mode are the intended output modes. The Relative output mode setting must match OTD so that the matching pointer is selected. If the selected pointer does not provide scrolling, the plugin logs a warning and leaves normal pen input active. Windows Ink, custom output modes, and asynchronous interpolation filters have not been verified. Start with other filters disabled when troubleshooting.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ Configure these options in **Scroll Flow: Input**:
 | Button number | 1 | Pen/Aux buttons are numbered from 1. |
 | Tip pressure (%) | 1 | Pressure required to recognize scrolling movement |
 | Vertical threshold (mm) | 0.5 | Tablet displacement required to start vertical scrolling |
-| Wheel units per mm | 24 | Wheel units per millimeter; 120 Windows wheel units usually equal one notch |
+| Wheel units per mm | 24 | OTD wheel units per millimeter; Windows/Linux use 120 units per notch, while macOS uses pixels. Adjust speed per platform. |
 | Reverse vertical | false | Reverse vertical scrolling direction |
 | Reverse horizontal | false | Reverse horizontal scrolling direction |
 
@@ -57,12 +57,12 @@ dotnet build src/WacomScrollFlow/WacomScrollFlow.csproj -c Release
 dotnet test tests/WacomScrollFlow.Tests/WacomScrollFlow.Tests.csproj -c Release
 ```
 
-Production code is in `src/WacomScrollFlow/`; xUnit tests are in `tests/WacomScrollFlow.Tests/`. Tests cover gesture direction, pixel thresholds, tip lifting, fractional wheel accumulation, cursor locking, button masking, and click suppression during button bounce.
+Production code is in `src/WacomScrollFlow/`; xUnit tests are in `tests/WacomScrollFlow.Tests/`. CI runs these tests on Windows, Linux, and macOS using recording pointers rather than injecting OS events. This verifies managed behavior, not actual desktop scrolling. Tests cover gesture direction, pixel thresholds, tip lifting, fractional wheel accumulation, cursor locking, button masking, and click suppression during button bounce.
 
 To create a release ZIP and SHA256 checksum locally after building:
 
 ```powershell
-./scripts/Package.ps1 -Version 0.1.2
+./scripts/Package.ps1 -Version 0.1.3
 ```
 
 ## Releases
@@ -72,13 +72,13 @@ Pushing a version tag triggers GitHub Actions to validate the version, run the t
 For a new release, update `<Version>` in `src/WacomScrollFlow/WacomScrollFlow.csproj`, commit and push the change, then push a matching tag:
 
 ```powershell
-git tag -a v0.1.3 -m "Release v0.1.3"
-git push origin v0.1.3
+git tag -a v0.1.4 -m "Release v0.1.4"
+git push origin v0.1.4
 ```
 
 ## Implementation
 
-The input filter reads tablet millimeters and suppresses pressure before OTD's binding handler. The output filter observes transformed pixel movement before locking the cursor, preserving the last absolute position or zeroing relative displacement. Wheel events use Windows `SendInput`.
+The input filter reads tablet millimeters and suppresses pressure before OTD's binding handler. The output filter observes transformed pixel movement before locking the cursor, preserving the last absolute position or zeroing relative displacement. Wheel events use OTD's `IMouseScrollHandler` on the selected absolute or relative pointer, with explicit `ISynchronousPointer.Flush()` when needed. No Windows native calls or keyboard polling remain. macOS direction and speed follow OTD's backend and system scroll settings and require real-device verification.
 
 See OTD's [output pipeline](https://github.com/OpenTabletDriver/OpenTabletDriver/blob/v0.6.7/OpenTabletDriver.Plugin/Output/OutputMode.cs). If the first report arrives while the button is held and no absolute cursor anchor is available, movement is withheld until normal positioning resumes.
 

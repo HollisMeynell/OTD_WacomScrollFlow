@@ -2,11 +2,11 @@
 
 [English](README.md) | 简体中文
 
-**源码更新：** 当前源码已移除 Keyboard 模式和键盘轮询，仅支持 Pen/Aux 按钮。现有 v0.1.2 发布包未重新编译，仍包含 Keyboard 模式。
+**v0.1.3 源码：** 已改用 OTD 提供的滚轮接口，面向 Windows、Linux 和 macOS，仅支持 Pen/Aux 按钮。现有 v0.1.2 发布包保持不变，仍仅支持 Windows 并包含 Keyboard 模式。
 
 本项目（包括 v0.1.2 发布版本）使用 [MIT No Attribution（MIT-0）许可证](LICENSE)，允许使用、修改、分发和商用，无需保留署名。
 
-Windows 上的 OpenTabletDriver 滚动插件。使用 .NET 8，针对 OTD 0.6.6.2 插件 API 编译；参考了 0.6.7 的输入管线源码。已在 OpenTabletDriver 0.6.7 中实机测试通过。
+OpenTabletDriver 笔滚动插件。使用 .NET 8，从 v0.1.3 起依赖 OTD 0.6.7 插件 API。旧版 v0.1.2 已在 Windows + OTD 0.6.7 中实机测试通过；v0.1.3 改用 OTD 的 Windows/Linux/macOS 指针后端，各平台均需进一步实机验证。
 
 ## 操作方式
 
@@ -37,7 +37,7 @@ dotnet test tests/WacomScrollFlow.Tests/WacomScrollFlow.Tests.csproj -c Release
 - **Scroll Flow: Input**：放在其他过滤器之前，读取原始坐标和压力。
 - **Scroll Flow: Cursor Lock**：放在其他过滤器之后，锁定转换后的输出。使用 OTD Relative Mode 时，把它的 **Relative output mode** 设为 `true`；Absolute Mode 保持 `false`。
 
-目前面向标准 Absolute Mode / Relative Mode；Windows Ink、其他自定义输出模式和异步插值过滤器未验证。先关闭其他过滤器进行验证。
+目前面向标准 Absolute Mode / Relative Mode；Relative output mode 必须与 OTD 的输出模式一致，以选择对应指针。指针不支持滚轮时，插件会记录警告并放行正常输入。Windows Ink、其他自定义输出模式和异步插值过滤器未验证。先关闭其他过滤器进行验证。
 
 Input 的配置项：
 
@@ -49,7 +49,7 @@ Input 的配置项：
 | Vertical threshold (mm) | 0.5 | 进入纵向滚动的位移 |
 | 横向切换阈值（固定） | 100px | 横向输出位移必须严格超过此值 |
 | 横向优势比例（固定） | 3 | 横向位移必须严格大于纵向位移的 3 倍，可从纵向切换 |
-| Wheel units per mm | 24 | 每毫米滚动量，Windows 的 120 单位通常相当于一格滚轮 |
+| Wheel units per mm | 24 | 每毫米 OTD 滚动量，Windows/Linux 的 120 单位相当于一格，macOS 使用像素单位，可按平台调整速度 |
 | Reverse vertical | false | 反转纵向滚动方向 |
 | Reverse horizontal | false | 反转横向滚动方向 |
 
@@ -61,7 +61,7 @@ Input 的配置项：
 
 ## 实现参考
 
-OTD 的 [OutputMode 输入管线](https://github.com/OpenTabletDriver/OpenTabletDriver/blob/v0.6.7/OpenTabletDriver.Plugin/Output/OutputMode.cs) 分为坐标转换前后两个阶段。本插件在前阶段计算毫米位移并屏蔽压力和滚动按键，在后阶段保留最后一次 OTD 输出的绝对位置或清零相对位移，不混用 Windows 屏幕坐标；滚轮通过 Windows `SendInput` 输出。若启用后第一份报告就是按住状态，且尚无可用的绝对位置，则暂不输出移动，直到松键恢复。
+OTD 的 [OutputMode 输入管线](https://github.com/OpenTabletDriver/OpenTabletDriver/blob/v0.6.7/OpenTabletDriver.Plugin/Output/OutputMode.cs) 分为坐标转换前后两个阶段。本插件在前阶段计算毫米位移并屏蔽压力和滚动按键，在后阶段保留最后一次 OTD 输出的绝对位置或清零相对位移，不混用 Windows 屏幕坐标；滚轮通过对应绝对／相对指针的 `IMouseScrollHandler` 输出，必要时调用 `ISynchronousPointer.Flush()`。源码不再调用 Windows 原生接口或轮询键盘；macOS 的速度、方向及系统滚动设置影响仍需实机验证。若启用后第一份报告就是按住状态，且尚无可用的绝对位置，则暂不输出移动，直到松键恢复。
 
 
 
@@ -76,4 +76,6 @@ git tag -a v0.1.3 -m "Release v0.1.3"
 git push origin v0.1.3
 ```
 
-本地构建后也可运行 `./scripts/Package.ps1 -Version 0.1.2` 打包。发布 ZIP 的根目录直接包含 DLL 和中英文说明。GitHub Release 不会自动进入 Plugins Manager，仍需单独向官方插件索引提交收录申请。
+本地构建后也可运行 `./scripts/Package.ps1 -Version 0.1.3` 打包。发布 ZIP 的根目录直接包含 DLL、许可证和中英文说明。GitHub Release 不会自动进入 Plugins Manager，仍需单独向官方插件索引提交收录申请。
+
+跨平台 CI 在 Windows、Linux 和 macOS 上使用记录型指针运行测试，不向系统发送真实滚轮事件，因此不能替代实机验证。v0.1.3 起发布包命名为 WacomScrollFlow-<版本>.zip，三个平台共用同一 DLL。

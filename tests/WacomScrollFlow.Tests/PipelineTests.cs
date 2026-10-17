@@ -1,11 +1,95 @@
 using System.Numerics;
 using OpenTabletDriver.Plugin.Tablet;
+using OpenTabletDriver.Plugin.Platform.Pointer;
 using Xunit;
 
 namespace WacomScrollFlow.Tests;
 
 public class PipelineTests
 {
+    private sealed class RecordingPointer : IAbsolutePointer, IRelativePointer, IMouseScrollHandler, ISynchronousPointer
+    {
+        public List<(string Axis, int Amount)> Events { get; } = new();
+        public int Flushes { get; private set; }
+        public void SetPosition(Vector2 position) { }
+        public void ScrollVertically(int amount) => Events.Add(("Vertical", amount));
+        public void ScrollHorizontally(int amount) => Events.Add(("Horizontal", amount));
+        public void Flush() => Flushes++;
+        public void Reset() { }
+    }
+
+    private sealed class PositionOnlyPointer : IAbsolutePointer
+    {
+        public void SetPosition(Vector2 position) { }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ScrollUsesSelectedOtdPointerAndFlushesEachWheelEvent(bool relative)
+    {
+        var tablet = Tablet();
+        var absolute = new RecordingPointer();
+        var relativePointer = new RecordingPointer();
+        var selected = relative ? relativePointer : absolute;
+        var unused = relative ? absolute : relativePointer;
+        using var cursor = new CursorLock { Tablet = tablet, RelativeOutput = relative,
+            AbsolutePointer = absolute, RelativePointer = relativePointer };
+        using var input = new ScrollInput { Tablet = tablet };
+        cursor.Initialize();
+        Vector2? previousPosition = null;
+        input.Emit += report =>
+        {
+            if (relative && report is IAbsolutePositionReport position)
+            {
+                Vector2 current = position.Position;
+                position.Position = previousPosition.HasValue ? current - previousPosition.Value : Vector2.Zero;
+                previousPosition = current;
+            }
+            cursor.Consume(report);
+        };
+        input.Consume(Report(false));
+        void Move(float x, float y, bool down = true, uint pressure = 100)
+        {
+            var report = Report(down, pressure);
+            report.Position = new Vector2(x, y);
+            input.Consume(report);
+        }
+        Move(10, 20);
+        Move(10, 30);
+        Move(10, 40);
+        Assert.Equal(new[] { ("Vertical", 24) }, selected.Events);
+        Move(200, 40); // Switch to horizontal in post-transform output.
+        Move(210, 40);
+        Assert.Equal(("Horizontal", -24), selected.Events.Last());
+        int count = selected.Events.Count;
+        Move(220, 40, false); // Pause without lifting.
+        Move(230, 40, false);
+        Assert.Equal(count, selected.Events.Count);
+        Move(240, 40); // Resume from the latest paused position.
+        Assert.Equal(("Horizontal", -24), selected.Events.Last());
+        Move(240, 40, false, 0);
+        Move(300, 100, false);
+        Assert.Equal(count + 1, selected.Events.Count);
+        Assert.Equal(selected.Events.Count, selected.Flushes);
+        Assert.Empty(unused.Events);
+    }
+
+    [Fact]
+    public void PointerWithoutScrollSupportLeavesNormalInputUnchanged()
+    {
+        var tablet = Tablet();
+        using var cursor = new CursorLock { Tablet = tablet, AbsolutePointer = new PositionOnlyPointer() };
+        using var input = new ScrollInput { Tablet = tablet };
+        cursor.Initialize();
+        input.Emit += cursor.Consume;
+        var report = Report(true, 100);
+        input.Consume(report);
+        Assert.Equal(100u, report.Pressure);
+        Assert.True(report.PenButtons[0]);
+        Assert.Equal(new Vector2(10, 20), report.Position);
+    }
+
     private static TabletReference Tablet() => new()
     {
         Properties = new TabletConfiguration
@@ -39,7 +123,7 @@ public class PipelineTests
     public void HeldButtonFreezesHoverAndReleaseRestoresMovement(bool relative)
     {
         var tablet = Tablet();
-        using var cursor = new CursorLock { Tablet = tablet, RelativeOutput = relative };
+        using var cursor = new CursorLock { AbsolutePointer = new RecordingPointer(), RelativePointer = new RecordingPointer(), Tablet = tablet, RelativeOutput = relative };
         using var input = new ScrollInput { Tablet = tablet };
         cursor.Initialize();
         input.Emit += cursor.Consume;
@@ -68,7 +152,7 @@ public class PipelineTests
     public void HeldButtonSuppressesTipBinding()
     {
         var tablet = Tablet();
-        using var cursor = new CursorLock { Tablet = tablet };
+        using var cursor = new CursorLock { AbsolutePointer = new RecordingPointer(), RelativePointer = new RecordingPointer(), Tablet = tablet };
         using var input = new ScrollInput { Tablet = tablet };
         cursor.Initialize();
         var report = Report(true, 100);
@@ -81,7 +165,7 @@ public class PipelineTests
     public void AuxiliaryButtonStatePersistsAcrossPenReports()
     {
         var tablet = Tablet();
-        using var cursor = new CursorLock { Tablet = tablet };
+        using var cursor = new CursorLock { AbsolutePointer = new RecordingPointer(), RelativePointer = new RecordingPointer(), Tablet = tablet };
         using var input = new ScrollInput { Tablet = tablet, ButtonSource = "Aux" };
         cursor.Initialize();
         IAuxReport aux = new AuxReport { Raw = Array.Empty<byte>(), AuxButtons = new[] { true } };
@@ -106,7 +190,7 @@ public class PipelineTests
     public void ReleaseWhileTouchingFreezesAndSuppressesUntilLiftAcrossButtonBounce(bool relative)
     {
         var tablet = Tablet();
-        using var cursor = new CursorLock { Tablet = tablet, RelativeOutput = relative };
+        using var cursor = new CursorLock { AbsolutePointer = new RecordingPointer(), RelativePointer = new RecordingPointer(), Tablet = tablet, RelativeOutput = relative };
         using var input = new ScrollInput { Tablet = tablet };
         cursor.Initialize();
         input.Emit += cursor.Consume;
@@ -134,7 +218,7 @@ public class PipelineTests
     {
         var tablet = Tablet();
         using var input = new ScrollInput { Tablet = tablet };
-        var cursor = new CursorLock { Tablet = tablet };
+        var cursor = new CursorLock { AbsolutePointer = new RecordingPointer(), RelativePointer = new RecordingPointer(), Tablet = tablet };
         cursor.Initialize();
         input.Consume(Report(true, 100));
         cursor.Dispose();
@@ -147,7 +231,7 @@ public class PipelineTests
     public void FirstReportWhileHeldNeverInventsAnAbsoluteCursorPosition()
     {
         var tablet = Tablet();
-        using var cursor = new CursorLock { Tablet = tablet };
+        using var cursor = new CursorLock { AbsolutePointer = new RecordingPointer(), RelativePointer = new RecordingPointer(), Tablet = tablet };
         using var input = new ScrollInput { Tablet = tablet };
         cursor.Initialize();
         input.Emit += cursor.Consume;
@@ -164,7 +248,7 @@ public class PipelineTests
     public void MaskingScrollButtonPreservesOtherButtonsAndOriginalArray()
     {
         var tablet = Tablet();
-        using var cursor = new CursorLock { Tablet = tablet };
+        using var cursor = new CursorLock { AbsolutePointer = new RecordingPointer(), RelativePointer = new RecordingPointer(), Tablet = tablet };
         using var input = new ScrollInput { Tablet = tablet };
         cursor.Initialize();
         var original = new[] { true, true };
@@ -179,7 +263,7 @@ public class PipelineTests
     public void TabletSessionsAreIsolated()
     {
         var first = Tablet();
-        using var cursor = new CursorLock { Tablet = first };
+        using var cursor = new CursorLock { AbsolutePointer = new RecordingPointer(), RelativePointer = new RecordingPointer(), Tablet = first };
         using var input = new ScrollInput { Tablet = first };
         using var other = new ScrollInput { Tablet = Tablet() };
         cursor.Initialize();

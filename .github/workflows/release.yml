@@ -52,8 +52,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create $env:GITHUB_REF_NAME `
-            "artifacts/WacomScrollFlow-$env:RELEASE_VERSION-win.zip" `
-            "artifacts/WacomScrollFlow-$env:RELEASE_VERSION-win.zip.sha256" `
+            "artifacts/WacomScrollFlow-$env:RELEASE_VERSION.zip" `
+            "artifacts/WacomScrollFlow-$env:RELEASE_VERSION.zip.sha256" `
             --repo $env:GITHUB_REPOSITORY `
             --verify-tag `
             --title "WacomScrollFlow $env:GITHUB_REF_NAME" `

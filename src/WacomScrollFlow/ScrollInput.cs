@@ -3,11 +3,12 @@ using OpenTabletDriver.Plugin;
 using OpenTabletDriver.Plugin.Attributes;
 using OpenTabletDriver.Plugin.Output;
 using OpenTabletDriver.Plugin.Tablet;
+using OpenTabletDriver.Plugin.Platform.Pointer;
 
 namespace WacomScrollFlow;
 
 [PluginName("Scroll Flow: Input")]
-[SupportedPlatform(PluginPlatform.Windows)]
+[SupportedPlatform(PluginPlatform.Windows | PluginPlatform.Linux | PluginPlatform.MacOS)]
 public sealed class ScrollInput : IPositionedPipelineElement<IDeviceReport>, IDisposable
 {
     [TabletReference] public TabletReference Tablet { get; set; } = null!;
@@ -28,7 +29,7 @@ public sealed class ScrollInput : IPositionedPipelineElement<IDeviceReport>, IDi
     [Property("Vertical threshold (mm)"), DefaultPropertyValue(0.5f)]
     public float VerticalThreshold { get; set; } = 0.5f;
 
-    [Property("Wheel units per mm"), DefaultPropertyValue(24f), ToolTip("120 units = one wheel notch on Windows.")]
+    [Property("Wheel units per mm"), DefaultPropertyValue(24f), ToolTip("OTD wheel units per millimeter. 120 units = one wheel notch on Windows/Linux; macOS uses pixel scrolling.")]
     public float UnitsPerMm { get; set; } = 24;
 
     [BooleanProperty("Reverse vertical", "Invert the default up-stroke to down-scroll direction."), DefaultPropertyValue(false)]
@@ -93,8 +94,10 @@ public sealed class ScrollInput : IPositionedPipelineElement<IDeviceReport>, IDi
                 var scroll = session.Gesture.Update(mm, touching,
                     Math.Max(0.01f, Finite(VerticalThreshold, 0.5f)),
                     Math.Clamp(Finite(UnitsPerMm, 24), 0.01f, 1200), ReverseVertical, ReverseHorizontal);
-                if (scroll.Vertical != 0) NativeScroll.Scroll(scroll.Vertical, false);
-                if (scroll.Horizontal != 0) NativeScroll.Scroll(scroll.Horizontal, true);
+                if (scroll.Vertical != 0) session.ScrollPointer?.ScrollVertically(scroll.Vertical);
+                if (scroll.Horizontal != 0) session.ScrollPointer?.ScrollHorizontally(scroll.Horizontal);
+                if ((scroll.Vertical != 0 || scroll.Horizontal != 0) && session.ScrollPointer is ISynchronousPointer synchronous)
+                    synchronous.Flush();
                 // Suppress the tip binding before OTD's post-transform binding handler.
                 tabletReport.Pressure = 0;
             }
